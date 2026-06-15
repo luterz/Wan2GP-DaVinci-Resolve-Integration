@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<BlackmagicDesign>
+    <Plugin>
+        <Id>com.antigravity.wangp</Id>
+        <Name>Wan2GP Resolve AI</Name>
+        <Version>1.0</Version>
+        <Description>Wan2GP Resolve AI Workflow Integration</Description>
+        <FilePath>main.js</FilePath>
+    </Plugin>
+</BlackmagicDesign>

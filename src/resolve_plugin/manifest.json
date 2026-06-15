@@ -1,0 +1,8 @@
+{
+    "name": "Wan2GP Resolve AI",
+    "version": "0.1.0",
+    "ui_class": "com.deepbeepmeep.wangp",
+    "entry_point": "ui/index.html",
+    "script_entry_point": "bridge/app.py",
+    "developer_id": "com.deepbeepmeep"
+}

@@ -1,0 +1,6 @@
+{
+    "name": "wangp-resolve-plugin",
+    "version": "1.0.0",
+    "description": "Wan2GP Resolve AI Workflow Integration",
+    "main": "main.js"
+}

@@ -1,0 +1,200 @@
+import os
+import json
+import subprocess
+import math
+
+
+def get_wan2gp_python(wan2gp_dir):
+    is_windows = os.name == 'nt'
+    script_dir = "Scripts" if is_windows else "bin"
+    exe_name = "python.exe" if is_windows else "python"
+    paths = [
+        os.path.join(wan2gp_dir, "wan2gp", script_dir, exe_name),
+        os.path.join(wan2gp_dir, "venv", script_dir, exe_name),
+        os.path.join(wan2gp_dir, ".venv", script_dir, exe_name)
+    ]
+    for p in paths:
+        if os.path.exists(p):
+            return p
+    return "python"
+
+
+class WanGPAdapter:
+    def __init__(self):
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        self.output_dir = os.path.join(project_root, "data", "cache")
+        os.makedirs(self.output_dir, exist_ok=True)
+        config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.json")
+        self.wan2gp_dir = ""
+        if os.path.exists(config_path):
+            with open(config_path, "r") as f:
+                self.wan2gp_dir = json.load(f).get("wan2gp_dir", "")
+
+    def process_job(self, job_data: dict) -> dict:
+        try:
+            if not self.wan2gp_dir:
+                return {"status": "error", "error": "Wan2GP directory not configured"}
+
+            mode = job_data.get("mode", "inpaint")
+            params = job_data.get("parameters", {})
+            input_media = job_data.get("input_media", {})
+            job_id = job_data.get("id", "unknown")
+            model_type = params.get("model_type", "")
+            prompt = params.get("prompt", "")
+            resolution = params.get("out_resolution", "832x480")
+
+            if mode == "inpaint":
+                settings = self._build_inpaint_settings(params, input_media, job_id, model_type, prompt, resolution)
+            elif mode == "generate_i2v":
+                settings = self._build_i2v_settings(params, input_media, model_type, prompt, resolution)
+            elif mode == "audio_tts":
+                settings = self._build_tts_settings(params, model_type, prompt)
+            else:
+                return {"status": "error", "error": f"Unknown mode: {mode}"}
+
+            if settings is None:
+                return {"status": "error", "error": "Failed to build settings"}
+
+            # Write settings and run WanGP
+            settings_path = os.path.join(self.output_dir, f"job_{job_id}_settings.json")
+            with open(settings_path, "w") as f:
+                json.dump(settings, f)
+
+            env = os.environ.copy()
+            env["PYTHONPATH"] = f"{self.wan2gp_dir}{os.pathsep}{env.get('PYTHONPATH', '')}"
+            python_exe = get_wan2gp_python(self.wan2gp_dir)
+
+            process = subprocess.Popen(
+                [python_exe, "wgp.py", "--process", settings_path, "--output-dir", self.output_dir],
+                cwd=self.wan2gp_dir,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            stdout, stderr = process.communicate()
+
+            # Save logs
+            log_path = os.path.join(self.output_dir, "last_run.log")
+            with open(log_path, "w") as lf:
+                lf.write(f"STDOUT:\n{stdout}\n\nSTDERR:\n{stderr}")
+
+            if process.returncode != 0:
+                error_msg = stderr.strip() if stderr.strip() else stdout.strip()
+                return {"status": "error", "error": f"WanGP failed. Check last_run.log. Error: {error_msg[:500]}"}
+
+            # Find output
+            if mode == "audio_tts":
+                out_files = [os.path.join(self.output_dir, f) for f in os.listdir(self.output_dir)
+                             if f.endswith(".wav") or f.endswith(".mp3") or f.endswith(".flac") or f.endswith(".mp4")]
+            else:
+                out_files = [os.path.join(self.output_dir, f) for f in os.listdir(self.output_dir)
+                             if f.endswith(".mp4") or f.endswith(".mov")]
+
+            if not out_files:
+                return {"status": "error", "error": "No output file found"}
+
+            latest = max(out_files, key=os.path.getmtime)
+            return {"status": "success", "output_path": latest}
+
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
+
+    def _build_inpaint_settings(self, params, input_media, job_id, model_type, prompt, resolution):
+        """Build settings for VACE inpainting or EditAnything mode."""
+        model_type = model_type or "vace_14B_2_2"
+        is_edit_anything = "edit_anything" in model_type.lower()
+        
+        settings = {
+            "model_type": model_type,
+            "prompt": prompt,
+            "resolution": resolution,
+            "num_inference_steps": params.get("steps", 30 if not is_edit_anything else 8),
+            "image_mode": 0,
+            "video_guide": input_media.get("path", ""),
+        }
+
+        if is_edit_anything:
+            settings["sample_solver"] = "euler"
+            settings["video_prompt_type"] = "VGI"
+            # LTX-2: native fps 24, frames must be 8n+1
+            duration_seconds = input_media.get("duration_seconds", 4.0)
+            target_frames = max(25, int(duration_seconds * 24))
+            settings["video_length"] = ((target_frames - 1 + 7) // 8) * 8 + 1
+            
+            # EditAnything expects a reference image if available
+            image_refs = params.get("image_refs", [])
+            if image_refs:
+                settings["image_refs"] = image_refs
+                
+            # No mask needed for EditAnything
+        else:
+            settings["sample_solver"] = "unipc"
+            
+            # Force background preservation for VACE Inpainting
+            settings["video_source"] = input_media.get("path", "")
+            settings["denoising_strength"] = 0.90
+            
+            # Set flow_shift based on model variant
+            if "2_2" in model_type:
+                settings["flow_shift"] = 2.0
+            else:
+                settings["flow_shift"] = 5.0
+                
+            # Calculate video_length from source duration (VACE: native fps 16, frames 4n+1)
+            duration_seconds = input_media.get("duration_seconds", 4.0)
+            target_frames = max(17, int(duration_seconds * 16))
+            settings["video_length"] = ((target_frames - 1 + 3) // 4) * 4 + 1
+
+            # Process mask for VACE
+            mask_path = ""
+            if params.get("mask_base64"):
+                import base64
+                from PIL import Image
+                import io
+                mask_data = params["mask_base64"].split(",")[1] if "," in params["mask_base64"] else params["mask_base64"]
+                img = Image.open(io.BytesIO(base64.b64decode(mask_data)))
+                if img.mode == 'RGBA':
+                    img = img.split()[3]  # Extract alpha channel
+                elif img.mode != 'L':
+                    img = img.convert('L')
+                mask_path = os.path.join(self.output_dir, f"mask_{job_id}.png")
+                img.save(mask_path)
+
+            if mask_path:
+                settings["video_mask"] = mask_path
+                # MVA = M(Inpainting) + V(Control Video) + A(Mask Active)
+                settings["video_prompt_type"] = "MVA"
+            else:
+                # MV = M(Inpainting) + V(Control Video), no mask
+                settings["video_prompt_type"] = "MV"
+
+        return settings
+
+    def _build_i2v_settings(self, params, input_media, model_type, prompt, resolution):
+        """Build settings for LTX-2 image-to-video generation."""
+        duration_seconds = params.get("duration_seconds", 4)
+        target_fps = 24  # LTX-2 native fps
+        target_frames = max(25, int(duration_seconds * target_fps))
+        # LTX-2: frames must be 8n+1
+        target_frames = ((target_frames - 1 + 7) // 8) * 8 + 1
+
+        settings = {
+            "model_type": model_type or "ltx2_22B_distilled_1_1",
+            "prompt": prompt,
+            "resolution": resolution if resolution != "832x480" else "1280x720",
+            "num_inference_steps": params.get("steps", 8),
+            "image_mode": 0,
+            "image_start": input_media.get("path", ""),
+            "video_length": target_frames,
+        }
+        return settings
+
+    def _build_tts_settings(self, params, model_type, prompt):
+        """Build settings for TTS audio generation."""
+        settings = {
+            "model_type": model_type or "qwen3_tts_base",
+            "prompt": prompt,
+            "duration_seconds": params.get("duration_seconds", 30),
+        }
+        return settings
