@@ -64,8 +64,12 @@ class WanGPAdapter:
             env["PYTHONPATH"] = f"{self.wan2gp_dir}{os.pathsep}{env.get('PYTHONPATH', '')}"
             python_exe = get_wan2gp_python(self.wan2gp_dir)
 
+            cmd = [python_exe, "wgp.py", "--process", settings_path, "--output-dir", self.output_dir]
+            if params.get("fast_attention", True):
+                cmd.extend(["--attention", "sage2"])
+
             process = subprocess.Popen(
-                [python_exe, "wgp.py", "--process", settings_path, "--output-dir", self.output_dir],
+                cmd,
                 cwd=self.wan2gp_dir,
                 env=env,
                 stdout=subprocess.PIPE,
@@ -96,83 +100,77 @@ class WanGPAdapter:
 
             latest = max(out_files, key=os.path.getmtime)
             return {"status": "success", "output_path": latest}
-
         except Exception as e:
             return {"status": "error", "error": str(e)}
 
     def _build_inpaint_settings(self, params, input_media, job_id, model_type, prompt, resolution):
-        """Build settings for VACE inpainting or EditAnything mode."""
+        """Build settings for VACE or LTX-2 inpainting mode."""
         model_type = model_type or "vace_14B_2_2"
-        is_edit_anything = "edit_anything" in model_type.lower()
+        is_ltx2 = "ltx2" in model_type.lower()
         
         settings = {
             "model_type": model_type,
             "prompt": prompt,
             "resolution": resolution,
-            "num_inference_steps": params.get("steps", 30 if not is_edit_anything else 8),
+            "num_inference_steps": params.get("steps", 8 if is_ltx2 else 30),
             "image_mode": 0,
             "video_guide": input_media.get("path", ""),
+            "sample_solver": "euler" if is_ltx2 else "unipc",
+            "video_source": input_media.get("path", ""),
+            "denoising_strength": 1.0 if is_ltx2 else 0.90,
         }
 
-        if is_edit_anything:
-            settings["sample_solver"] = "euler"
-            settings["video_prompt_type"] = "VGI"
-            # LTX-2: native fps 24, frames must be 8n+1
-            duration_seconds = input_media.get("duration_seconds", 4.0)
-            target_frames = max(25, int(duration_seconds * 24))
-            settings["video_length"] = ((target_frames - 1 + 7) // 8) * 8 + 1
-            
-            # EditAnything expects a reference image if available
-            image_refs = params.get("image_refs", [])
-            if image_refs:
-                settings["image_refs"] = image_refs
-                
-            # No mask needed for EditAnything
-        else:
-            settings["sample_solver"] = "unipc"
-            
-            # Force background preservation for VACE Inpainting
-            settings["video_source"] = input_media.get("path", "")
-            settings["denoising_strength"] = 0.90
-            
-            # Set flow_shift based on model variant
+        if not is_ltx2:
+            # Set flow_shift based on model variant for VACE
             if "2_2" in model_type:
                 settings["flow_shift"] = 2.0
             else:
                 settings["flow_shift"] = 5.0
-                
-            # Calculate video_length from source duration (VACE: native fps 16, frames 4n+1)
-            duration_seconds = input_media.get("duration_seconds", 4.0)
+            
+        # Calculate video_length from source duration
+        duration_seconds = input_media.get("duration_seconds", 4.0)
+        
+        if is_ltx2:
+            # LTX-2: native fps 24, frames 8n+1
+            target_frames = max(25, int(duration_seconds * 24))
+            settings["video_length"] = ((target_frames - 1 + 7) // 8) * 8 + 1
+        else:
+            # VACE: native fps 16, frames 4n+1
             target_frames = max(17, int(duration_seconds * 16))
             settings["video_length"] = ((target_frames - 1 + 3) // 4) * 4 + 1
 
-            # Process mask for VACE
-            mask_path = ""
-            if params.get("mask_base64"):
-                import base64
-                from PIL import Image
-                import io
-                mask_data = params["mask_base64"].split(",")[1] if "," in params["mask_base64"] else params["mask_base64"]
-                img = Image.open(io.BytesIO(base64.b64decode(mask_data)))
-                if img.mode == 'RGBA':
-                    img = img.split()[3]  # Extract alpha channel
-                elif img.mode != 'L':
-                    img = img.convert('L')
-                mask_path = os.path.join(self.output_dir, f"mask_{job_id}.png")
-                img.save(mask_path)
+        # Process mask for VACE
+        mask_path = ""
+        if params.get("mask_base64"):
+            import base64
+            from PIL import Image
+            import io
+            mask_data = params["mask_base64"].split(",")[1] if "," in params["mask_base64"] else params["mask_base64"]
+            img = Image.open(io.BytesIO(base64.b64decode(mask_data)))
+            if img.mode == 'RGBA':
+                img = img.split()[3]  # Extract alpha channel
+            elif img.mode != 'L':
+                img = img.convert('L')
+            mask_path = os.path.join(self.output_dir, f"mask_{job_id}.png")
+            img.save(mask_path)
 
-            if mask_path:
-                settings["video_mask"] = mask_path
-                # MVA = M(Inpainting) + V(Control Video) + A(Mask Active)
-                settings["video_prompt_type"] = "MVA"
+        if mask_path:
+            settings["video_mask"] = mask_path
+            if is_ltx2:
+                settings["video_prompt_type"] = "VVA"
+                settings["masking_strength"] = 1.0
             else:
-                # MV = M(Inpainting) + V(Control Video), no mask
-                settings["video_prompt_type"] = "MV"
+                settings["video_prompt_type"] = "MVA"
+        else:
+            # MV = M(Inpainting) + V(Control Video), no mask
+            settings["video_prompt_type"] = "MV"
 
         return settings
 
     def _build_i2v_settings(self, params, input_media, model_type, prompt, resolution):
         """Build settings for LTX-2 image-to-video generation."""
+        model_type = model_type or "ltx2_22B_distilled_1_1"
+        
         duration_seconds = params.get("duration_seconds", 4)
         target_fps = 24  # LTX-2 native fps
         target_frames = max(25, int(duration_seconds * target_fps))
@@ -180,21 +178,29 @@ class WanGPAdapter:
         target_frames = ((target_frames - 1 + 7) // 8) * 8 + 1
 
         settings = {
-            "model_type": model_type or "ltx2_22B_distilled_1_1",
+            "model_type": model_type,
             "prompt": prompt,
             "resolution": resolution if resolution != "832x480" else "1280x720",
             "num_inference_steps": params.get("steps", 8),
             "image_mode": 0,
-            "image_start": input_media.get("path", ""),
             "video_length": target_frames,
+            "image_start": input_media.get("path", "")
         }
+
         return settings
 
     def _build_tts_settings(self, params, model_type, prompt):
         """Build settings for TTS audio generation."""
         settings = {
-            "model_type": model_type or "qwen3_tts_base",
+            "model_type": model_type or "qwen3_tts_voicedesign",
             "prompt": prompt,
             "duration_seconds": params.get("duration_seconds", 30),
         }
+        
+        # Audio generation extras (Language and Style/Prompt)
+        if params.get("model_mode"):
+            settings["model_mode"] = params["model_mode"]
+        if params.get("alt_prompt"):
+            settings["alt_prompt"] = params["alt_prompt"]
+            
         return settings
