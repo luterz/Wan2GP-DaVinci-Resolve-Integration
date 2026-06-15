@@ -1,0 +1,1 @@
+# Wan2GP-DaVinci-Resolve-Integration
