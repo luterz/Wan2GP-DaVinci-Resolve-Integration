@@ -40,9 +40,9 @@ Generation Clip
 
 Mask isn't apply to generation
 
-##not tested
+##not tested well but semmes to work ;)
 
-deepy integration
+deepy integration 
 
 
 ## Advanced Tips
