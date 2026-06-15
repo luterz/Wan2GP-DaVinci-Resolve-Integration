@@ -28,6 +28,19 @@ This project integrates Wan2GP (WanGP AI) into DaVinci Resolve, enabling you to 
 6. Click `Send Job to AI`.
 7. Once finished, the new clip will be imported into your media pool and placed on top of your original clip in the timeline!
 
+
+##Work
+
+Generation Audio
+Use sage attention
+Triton
+Generation Clip
+
+## not work
+
+Mask isn't apply to generation
+
+
 ## Advanced Tips
 - **EditAnything Models**: If you are using an `EditAnything Ref V2V` model, keep in mind they are fine-tuned for high-quality edits. If you only want to use a text prompt without an image reference, standard models like `LTX-2 Distilled` or `Wan2.2 Animate` are highly recommended for Text-based inpainting.
 - **Perfect Background Preservation**: The plugin uses an `alphamerge` FFmpeg process behind the scenes, meaning the pixels outside your mask will be **100% mathematically identical** to your original clip.
