@@ -40,6 +40,10 @@ Generation Clip
 
 Mask isn't apply to generation
 
+##not tested
+
+deepy integration
+
 
 ## Advanced Tips
 - **EditAnything Models**: If you are using an `EditAnything Ref V2V` model, keep in mind they are fine-tuned for high-quality edits. If you only want to use a text prompt without an image reference, standard models like `LTX-2 Distilled` or `Wan2.2 Animate` are highly recommended for Text-based inpainting.
