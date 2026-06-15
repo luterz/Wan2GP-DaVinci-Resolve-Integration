@@ -1,6 +1,7 @@
+
 # Wan2GP DaVinci Resolve Integration
 
-
+<img width="1006" height="830" alt="interface" src="https://github.com/user-attachments/assets/55661221-b8b3-4316-86fd-cc42c2844595" />
 https://github.com/luterz/Wan2GP-DaVinci-Resolve-Integration/blob/main/interface.png
 
 This project integrates Wan2GP (WanGP AI) into DaVinci Resolve, enabling you to use advanced AI models (like Wan2.2, LTX-Video, and EditAnything) to generate, inpaint, and modify clips directly from your DaVinci Resolve timeline.
