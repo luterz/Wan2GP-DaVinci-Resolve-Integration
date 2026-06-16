@@ -1,9 +1,4 @@
-
 # Wan2GP DaVinci Resolve Integration
-
-<img width="985" height="586" alt="{1841FB7D-4951-43EB-AFA9-533FF1AFB357}" src="https://github.com/user-attachments/assets/65bb1f64-a019-4ed0-abbe-0d085d355310" />
-
-https://github.com/luterz/Wan2GP-DaVinci-Resolve-Integration/blob/main/interface.png
 
 This project integrates Wan2GP (WanGP AI) into DaVinci Resolve, enabling you to use advanced AI models (like Wan2.2, LTX-Video, and EditAnything) to generate, inpaint, and modify clips directly from your DaVinci Resolve timeline.
 
@@ -28,23 +23,6 @@ This project integrates Wan2GP (WanGP AI) into DaVinci Resolve, enabling you to 
 5. Type your prompt (e.g., "rayban sunglasses").
 6. Click `Send Job to AI`.
 7. Once finished, the new clip will be imported into your media pool and placed on top of your original clip in the timeline!
-
-
-##Work
-
-Generation Audio
-Use sage attention
-Triton
-Generation Clip
-
-## not work
-
-Mask isn't apply to generation
-
-##not tested well but semmes to work ;)
-
-deepy integration 
-
 
 ## Advanced Tips
 - **EditAnything Models**: If you are using an `EditAnything Ref V2V` model, keep in mind they are fine-tuned for high-quality edits. If you only want to use a text prompt without an image reference, standard models like `LTX-2 Distilled` or `Wan2.2 Animate` are highly recommended for Text-based inpainting.

@@ -37,14 +37,39 @@ const cfgVal = document.getElementById("cfgVal");
 const brushSizeInput = document.getElementById("brushSize");
 const brushVal = document.getElementById("brushVal");
 const promptInput = document.getElementById("prompt");
+const hideTerminalCheckbox = document.getElementById("hideTerminalCheckbox");
+const referenceImageRow = document.getElementById("referenceImageRow");
+const referenceImageInput = document.getElementById("referenceImageInput");
+const referenceImagePreview = document.getElementById("referenceImagePreview");
+
+// Load hide terminal preference
+hideTerminalCheckbox.checked = localStorage.getItem("hideTerminal") === "true";
+hideTerminalCheckbox.addEventListener("change", () => {
+    localStorage.setItem("hideTerminal", hideTerminalCheckbox.checked);
+});
 
 // --- Model Definitions per Mode ---
 const MODE_MODELS = {
     inpaint: [
+        { value: "ltx2_22B_editanything", label: "LTX-2 2.3 EditAnything Ref V2V 22B", steps: 8 },
         { value: "vace_14B_2_2", label: "Wan 2.2 VACE 14B (Quality)", steps: 30 },
         { value: "vace_14B_fusionix", label: "VACE FusioniX 14B (Fast)", steps: 10 },
         { value: "vace_14B_lightning_3p_2_2", label: "VACE Lightning 14B (Ultra-fast)", steps: 8 },
         { value: "vace_14B", label: "VACE 14B (Wan 2.1)", steps: 30 },
+        { value: "ltx2_22B_distilled_1_1", label: "LTX-2 2.3 Distilled 1.1 22B (Recommended)", steps: 8 },
+        { value: "ltx2_22B_distilled", label: "LTX-2 2.3 Distilled 1.0 22B", steps: 8 },
+        { value: "ltx2_22B_distilled_gguf_q8_0", label: "LTX-2 2.3 Distilled GGUF Q8_0 22B", steps: 8 },
+        { value: "ltx2_22B_distilled_gguf_q6_k", label: "LTX-2 2.3 Distilled GGUF Q6_K 22B", steps: 8 },
+        { value: "ltx2_22B_distilled_gguf_q4_k_m", label: "LTX-2 2.3 Distilled GGUF Q4_K_M 22B", steps: 8 },
+        { value: "ltx2_22B_1_1", label: "LTX-2 2.3 Dev 1.1 22B", steps: 30 },
+        { value: "ltx2_22B", label: "LTX-2 2.3 Dev 1.0 22B", steps: 30 },
+        { value: "ltx2_22B_nvfp4", label: "LTX-2 2.3 Dev NVFP4 22B", steps: 30 },
+        { value: "ltx2_19B", label: "LTX-2 2.0 Dev 19B", steps: 30 },
+        { value: "ltx2_distilled", label: "LTX-2 2.0 Distilled 19B", steps: 8 },
+        { value: "ltx2_distilled_gguf_q8_0", label: "LTX-2 2.0 Distilled GGUF Q8_0 19B", steps: 8 },
+        { value: "ltx2_distilled_gguf_q6_k", label: "LTX-2 2.0 Distilled GGUF Q6_K 19B", steps: 8 },
+        { value: "ltx2_distilled_gguf_q4_k_m", label: "LTX-2 2.0 Distilled GGUF Q4_K_M 19B", steps: 8 },
+        { value: "ltx2_19B_nvfp4", label: "LTX-2 2.0 Dev NVFP4 19B", steps: 30 },
     ],
     generate_i2v: [
         { value: "ltx2_22B_distilled_1_1", label: "LTX-2 2.3 Distilled 1.1 22B (Recommended)", steps: 8 },
@@ -63,7 +88,8 @@ const MODE_MODELS = {
         { value: "ltx2_19B_nvfp4", label: "LTX-2 2.0 Dev NVFP4 19B", steps: 30 },
     ],
     audio_tts: [
-        { value: "qwen3_tts_base", label: "Qwen3 TTS Base (Voice Clone)" },
+        { value: "qwen3_tts_voicedesign", label: "Qwen3 VoiceDesign (Style Prompt)" },
+        { value: "qwen3_tts_customvoice", label: "Qwen3 CustomVoice (Built-in Speakers)" },
         { value: "index_tts2", label: "Index TTS 2 (Emotions)" },
         { value: "omnivoice", label: "OmniVoice (Zero-shot)" },
         { value: "kugelaudio_0_open", label: "KugelAudio (Dialogue)" },
@@ -77,6 +103,33 @@ const MODE_DEFAULTS = {
     generate_i2v: { duration: 4, promptPlaceholder: "Describe the video to generate from this frame...", btnText: "Extract First Frame & Generate" },
     audio_tts: { duration: 30, promptPlaceholder: "Enter text to speak or describe the audio/music to generate...", btnText: "Generate Audio" }
 };
+
+let currentReferenceImageBase64 = null;
+
+if (referenceImageInput) {
+    referenceImageInput.addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                currentReferenceImageBase64 = event.target.result;
+                referenceImagePreview.src = currentReferenceImageBase64;
+                referenceImagePreview.style.display = "block";
+            };
+            reader.readAsDataURL(file);
+        } else {
+            currentReferenceImageBase64 = null;
+            referenceImagePreview.style.display = "none";
+        }
+    });
+}
+
+function toggleEditAnything() {
+    const isEditAnything = modelSelect.value && modelSelect.value.includes("editanything");
+    if (referenceImageRow) {
+        referenceImageRow.style.display = isEditAnything ? "flex" : "none";
+    }
+}
 
 // --- Mode Switching ---
 function switchMode(mode) {
@@ -99,6 +152,8 @@ function switchMode(mode) {
     
     videoParams.style.display = isAudio ? "none" : "block";
     durationRow.style.display = (isI2V || isAudio) ? "flex" : "none";
+    document.getElementById("audioParams").style.display = isAudio ? "flex" : "none";
+    document.getElementById("altPromptRow").style.display = isAudio ? "flex" : "none";
     
     // Set duration default
     durationSlider.value = defaults.duration || 4;
@@ -119,6 +174,7 @@ function switchMode(mode) {
     
     // Hide mask editor when switching modes
     maskEditor.style.display = "none";
+    toggleEditAnything();
 }
 
 taskProfile.addEventListener("change", () => switchMode(taskProfile.value));
@@ -131,6 +187,7 @@ modelSelect.addEventListener("change", () => {
         stepsSlider.value = selected.steps;
         stepsVal.textContent = selected.steps;
     }
+    toggleEditAnything();
 });
 
 // Initialize with default mode
@@ -180,16 +237,21 @@ function stopServer() {
     log("Stopping Orchestrator...");
     if (os.platform() === 'win32') {
         cp.exec(`taskkill /F /IM uvicorn.exe /T`, () => {
-            cp.exec(`wmic process where "name='python.exe' and commandline like '%job_processor.py%'" call terminate`, () => log("Server stopped."));
+            cp.exec(`wmic process where "name='python.exe' and commandline like '%job_processor.py%'" call terminate`, () => {
+                cp.exec(`wmic process where "name='python.exe' and commandline like '%deepy_service.py%'" call terminate`, () => log("Server stopped."));
+            });
         });
     } else {
-        cp.exec(`pkill -f uvicorn`, () => cp.exec(`pkill -f job_processor.py`, () => log("Server stopped.")));
+        cp.exec(`pkill -f uvicorn`, () => cp.exec(`pkill -f job_processor.py`, () => cp.exec(`pkill -f deepy_service.py`, () => log("Server stopped."))));
     }
 }
 
 function startServer() {
     log("Starting Orchestrator...");
-    const cmd = os.platform() === 'win32' ? `start "" "${START_SCRIPT}"` : `sh "${START_SCRIPT}" &`;
+    const args = hideTerminalCheckbox.checked ? " --hidden" : "";
+    const cmd = os.platform() === 'win32' 
+        ? (hideTerminalCheckbox.checked ? `"${START_SCRIPT}" --hidden` : `start "" "${START_SCRIPT}"`)
+        : `sh "${START_SCRIPT}"${args} &`;
     cp.exec(cmd, (err) => { if (err) log("Error starting server: " + err.message); });
 }
 
@@ -387,7 +449,7 @@ processBtn.addEventListener("click", async () => {
             
             currentExportData = {
                 mode: "inpaint",
-                media_path: exportPath,
+                path: exportPath,
                 fps: timelineFps,
                 resolution: [1920, 1080],
                 duration_frames: duration,
@@ -427,41 +489,38 @@ submitJobBtn.addEventListener("click", async () => {
     
     try {
         log("Submitting job to Orchestrator...");
-        const jobId = generateUUID();
-        const mode = taskProfile.value;
-        const prompt = promptInput.value;
-        const selectedModel = modelSelect.value;
         
         let maskBase64 = null;
-        if (mode === "inpaint") {
+        if (taskProfile.value === "inpaint") {
             maskBase64 = maskCanvas.toDataURL("image/png");
         }
         
-        const jobPayload = {
+        const jobId = `job_${Math.random().toString(36).substring(2, 15)}`;
+        const mode = taskProfile.value;
+        
+        const jobData = {
             id: jobId,
             mode: mode,
-            input_media: {
-                path: currentExportData ? currentExportData.media_path : "",
-                fps: currentExportData ? (currentExportData.fps || 24.0) : 24.0,
-                resolution: currentExportData ? (currentExportData.resolution || [1920, 1080]) : [1920, 1080],
-                duration_frames: currentExportData ? (currentExportData.duration_frames || 100) : 100,
-                duration_seconds: currentExportData ? (currentExportData.duration_seconds || 4.0) : 4.0
-            },
+            input_media: currentExportData || {},
             parameters: {
-                prompt: prompt,
-                model_type: selectedModel,
-                mask_base64: maskBase64,
-                out_resolution: outResSelect.value,
+                model_type: modelSelect.value,
+                prompt: promptInput.value,
+                model_mode: document.getElementById("modelMode").value,
+                alt_prompt: document.getElementById("altPrompt").value,
                 steps: parseInt(stepsSlider.value),
                 cfg_scale: parseFloat(cfgSlider.value),
-                duration_seconds: (mode === "generate_i2v" || mode === "audio_tts") ? parseInt(durationSlider.value) : null
+                out_resolution: outResSelect.value,
+                mask_base64: maskBase64,
+                reference_image_base64: currentReferenceImageBase64,
+                duration_seconds: parseInt(durationSlider.value),
+                fast_attention: document.getElementById("fastAttention").checked
             }
         };
         
         const jobRes = await fetch(`${ORCHESTRATOR_URL}/api/v1/jobs`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(jobPayload)
+            body: JSON.stringify(jobData)
         });
         
         if (!jobRes.ok) throw new Error(`Job submission failed: ${jobRes.statusText}`);
@@ -530,3 +589,66 @@ submitJobBtn.addEventListener("click", async () => {
         processBtn.disabled = false;
     }
 });
+
+// --- Deepy Integration ---
+const deepyBtn = document.getElementById("deepyBtn");
+if (deepyBtn) {
+    deepyBtn.addEventListener("click", async () => {
+        const originalPrompt = promptInput.value.trim();
+        if (!originalPrompt) {
+            log("Please enter a prompt first before asking Deepy.");
+            return;
+        }
+        
+        deepyBtn.disabled = true;
+        const originalText = deepyBtn.innerHTML;
+        deepyBtn.innerHTML = "✨ Optimizing...";
+        log("Sending prompt to Deepy for enhancement...");
+        
+        try {
+            const mode = taskProfile.value === "audio_tts" ? "audio" : "video";
+            
+            let imageBase64 = null;
+            if (mode === "video" && refVideo && refVideo.readyState >= 2) {
+                const canvas = document.createElement("canvas");
+                canvas.width = refVideo.videoWidth;
+                canvas.height = refVideo.videoHeight;
+                canvas.getContext("2d").drawImage(refVideo, 0, 0, canvas.width, canvas.height);
+                imageBase64 = canvas.toDataURL("image/jpeg", 0.8);
+            }
+            
+            const req = {
+                prompt: originalPrompt,
+                mode: mode,
+                media_path: currentExportData ? currentExportData.path : null,
+                image_base64: imageBase64
+            };
+            
+            const res = await fetch(`http://127.0.0.1:8002/api/v1/deepy_enhance`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(req)
+            });
+            
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.detail || `Deepy Service Error: ${res.status}`);
+            }
+            
+            const data = await res.json();
+            if (data.status === "success" && data.enhanced_prompt) {
+                promptInput.value = data.enhanced_prompt;
+                log("Prompt successfully enhanced by Deepy!");
+            } else {
+                throw new Error("Invalid response from Deepy service.");
+            }
+            
+        } catch (err) {
+            log(`DEEPY ERROR: ${err.message}`);
+        } finally {
+            deepyBtn.disabled = false;
+            deepyBtn.innerHTML = originalText;
+        }
+    });
+}
+

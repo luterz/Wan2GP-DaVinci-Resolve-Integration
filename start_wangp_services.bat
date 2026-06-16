@@ -9,10 +9,18 @@ set PYTHONPATH=%PROGRAMDATA%\Blackmagic Design\DaVinci Resolve\Support\Developer
 set PATH=C:\Program Files\Blackmagic Design\DaVinci Resolve;%PATH%
 
 cd src\orchestrator
-start "WanGP Orchestrator API" ..\..\.venv\Scripts\uvicorn.exe main:app --host 127.0.0.1 --port 8000
-start "WanGP Job Processor" ..\..\.venv\Scripts\python.exe job_processor.py
-
-echo All services started in separate windows! 
+if "%1"=="--hidden" (
+    start /B "WanGP Orchestrator API" ..\..\.venv\Scripts\uvicorn.exe main:app --host 127.0.0.1 --port 8000
+    start /B "WanGP Job Processor" ..\..\.venv\Scripts\python.exe job_processor.py
+    start /B "WanGP Deepy API" ..\..\.venv\Scripts\python.exe deepy_service.py
+    echo All services started silently in background!
+    exit /b 0
+) else (
+    start "WanGP Orchestrator API" ..\..\.venv\Scripts\uvicorn.exe main:app --host 127.0.0.1 --port 8000
+    start "WanGP Job Processor" ..\..\.venv\Scripts\python.exe job_processor.py
+    start "WanGP Deepy API" cmd /k "..\..\.venv\Scripts\python.exe deepy_service.py"
+    echo All services started in separate windows! 
+)
 echo You can now open DaVinci Resolve and use the WanGP AI Workflow Integration.
 echo (Close the black terminal windows when you want to stop the servers)
 pause

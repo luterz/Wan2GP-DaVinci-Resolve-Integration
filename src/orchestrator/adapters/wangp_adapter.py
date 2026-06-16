@@ -153,8 +153,26 @@ class WanGPAdapter:
                 img = img.convert('L')
             mask_path = os.path.join(self.output_dir, f"mask_{job_id}.png")
             img.save(mask_path)
+            
+        # Process reference image for EditAnything
+        is_edit_anything = "editanything" in model_type.lower()
+        ref_image_path = ""
+        if is_edit_anything and params.get("reference_image_base64"):
+            import base64
+            from PIL import Image
+            import io
+            ref_data = params["reference_image_base64"].split(",")[1] if "," in params["reference_image_base64"] else params["reference_image_base64"]
+            img = Image.open(io.BytesIO(base64.b64decode(ref_data)))
+            ref_image_path = os.path.join(self.output_dir, f"ref_{job_id}.png")
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            img.save(ref_image_path)
 
-        if mask_path:
+        if is_edit_anything:
+            settings["video_prompt_type"] = "VGI"
+            if ref_image_path:
+                settings["image_refs"] = ref_image_path
+        elif mask_path:
             settings["video_mask"] = mask_path
             if is_ltx2:
                 settings["video_prompt_type"] = "VVA"

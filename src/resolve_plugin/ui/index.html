@@ -274,7 +274,11 @@
             <span id="serverDot" class="dot dot-red"></span>
             <span id="serverLabel">Orchestrator: Offline</span>
         </div>
-        <div class="server-controls">
+        <div class="server-controls" style="align-items: center;">
+            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; margin-right: 8px; font-size: 11px; color: var(--text-muted);">
+                <input type="checkbox" id="hideTerminalCheckbox" style="width: auto; margin: 0;">
+                Hide Terminal
+            </label>
             <button id="restartServerBtn" class="btn-secondary btn-small">Start/Restart</button>
             <button id="stopServerBtn" class="btn-danger btn-small">Stop</button>
         </div>
@@ -285,14 +289,23 @@
             <div class="col">
                 <label for="taskProfile">Task Profile</label>
                 <select id="taskProfile">
-                    <option value="inpaint">🎨 Inpaint / Edit (VACE)</option>
-                    <option value="generate_i2v">🎬 Generate i2v (LTX-2)</option>
+                    <option value="inpaint">🎨 Inpaint / Masking (LTX-2 & VACE)</option>
+                    <option value="generate_i2v">🎬 Generate i2v</option>
                     <option value="audio_tts">🔊 Audio TTS</option>
                 </select>
             </div>
             <div class="col">
                 <label for="modelSelect">Model</label>
                 <select id="modelSelect"></select>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--accent-success);">
+                    <input type="checkbox" id="fastAttention" checked style="width: auto; margin: 0;">
+                    ⚡ Use SageAttention / Triton (Faster)
+                </label>
             </div>
         </div>
 
@@ -337,7 +350,46 @@
             </div>
         </div>
 
-        <label for="prompt">Prompt</label>
+        <div class="row" id="audioParams" style="display: none;">
+            <div class="col">
+                <label for="modelMode">Language (Voice Only)</label>
+                <select id="modelMode">
+                    <option value="auto">Auto-detect</option>
+                    <option value="english">English</option>
+                    <option value="italian">Italian</option>
+                    <option value="chinese">Chinese</option>
+                    <option value="japanese">Japanese</option>
+                    <option value="korean">Korean</option>
+                    <option value="german">German</option>
+                    <option value="french">French</option>
+                    <option value="spanish">Spanish</option>
+                    <option value="russian">Russian</option>
+                    <option value="portuguese">Portuguese</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="row" id="altPromptRow" style="display: none;">
+            <div class="col">
+                <label for="altPrompt">Voice/Music Style (Optional)</label>
+                <textarea id="altPrompt" placeholder="e.g. cheerful, dramatic, 120bpm pop rock..." rows="2"></textarea>
+            </div>
+        </div>
+
+        <div class="row" id="referenceImageRow" style="display: none;">
+            <div class="col">
+                <label for="referenceImageInput" style="color: var(--accent-success);">Reference Image (EditAnything / Face Swap)</label>
+                <input type="file" id="referenceImageInput" accept="image/*" style="background: var(--bg-panel); color: var(--text-main); border: 1px dashed var(--border-color); padding: 8px;">
+                <img id="referenceImagePreview" style="display:none; max-width: 100px; max-height: 100px; margin-top: 8px; border-radius: 4px; border: 1px solid var(--border-color);">
+            </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <label for="prompt" style="margin: 0;">Prompt</label>
+            <button id="deepyBtn" class="btn-secondary btn-small" style="background: linear-gradient(135deg, #6366f1, #a855f7); border: none;">
+                ✨ Optimize with Deepy
+            </button>
+        </div>
         <textarea id="prompt" placeholder="Describe what you want to generate in the masked area..."></textarea>
     </div>
 

@@ -13,6 +13,7 @@ class JobParameters(BaseModel):
     prompt: str = ""
     model_type: Optional[str] = None
     mask_base64: Optional[str] = None
+    reference_image_base64: Optional[str] = None
     out_resolution: Optional[str] = None
     steps: Optional[int] = None
     cfg_scale: Optional[float] = None
