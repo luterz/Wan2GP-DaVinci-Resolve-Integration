@@ -155,7 +155,7 @@ class WanGPAdapter:
             img.save(mask_path)
             
         # Process reference image for EditAnything
-        is_edit_anything = "editanything" in model_type.lower()
+        is_edit_anything = "editanything" in model_type.lower().replace("_", "")
         ref_image_path = ""
         if is_edit_anything and params.get("reference_image_base64"):
             import base64
