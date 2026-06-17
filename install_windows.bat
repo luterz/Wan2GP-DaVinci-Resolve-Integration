@@ -59,17 +59,16 @@ if not exist ".venv" (
 
 echo Installing requirements...
 call .venv\Scripts\activate.bat
-pip install -r src\orchestrator\requirements.txt >nul
+pip install -r requirements.txt >nul
 echo Python environment ready.
 echo.
 
 :: 3. Create Desktop Shortcut
 echo [4/4] Creating Desktop Shortcut for background services...
-set "SHORTCUT_PATH=%USERPROFILE%\Desktop\Start WanGP Services.lnk"
 set "TARGET_PATH=%~dp0start_wangp_services.bat"
 set "WORKING_DIR=%~dp0"
 
-powershell -Command "$wshell = New-Object -ComObject WScript.Shell; $s = $wshell.CreateShortcut('%SHORTCUT_PATH%'); $s.TargetPath = '%TARGET_PATH%'; $s.WorkingDirectory = '%WORKING_DIR%'; $s.WindowStyle = 7; $s.Save()"
+powershell -Command "$wshell = New-Object -ComObject WScript.Shell; $desktop = [Environment]::GetFolderPath('Desktop'); $s = $wshell.CreateShortcut(""""$desktop\Start WanGP Services.lnk""""); $s.TargetPath = '%TARGET_PATH%'; $s.WorkingDirectory = '%WORKING_DIR%'; $s.WindowStyle = 7; $s.Save()"
 
 echo.
 echo ========================================================

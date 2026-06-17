@@ -57,7 +57,12 @@ async def enhance_prompt(req: EnhanceRequest):
         
         env = os.environ.copy()
         
-        cmd_args = [python_exe, script_path, "--prompt", req.prompt, "--mode", req.mode, "--wan2gp_dir", wan2gp_dir]
+        # Map task types like V2V, I2V, T2V to 'video' for deepy.py
+        deepy_mode = "video"
+        if req.mode and req.mode.lower() in ["image", "audio"]:
+            deepy_mode = req.mode.lower()
+            
+        cmd_args = [python_exe, script_path, "--prompt", req.prompt, "--mode", deepy_mode, "--wan2gp_dir", wan2gp_dir]
         
         # If UI sends base64, save it to a file
         media_path_to_use = req.media_path

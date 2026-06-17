@@ -170,6 +170,7 @@ class WanGPAdapter:
 
         if mask_path:
             settings["video_mask"] = mask_path
+            settings["masking_strength"] = 1.0
 
         if is_edit_anything:
             if mask_path:
@@ -182,7 +183,6 @@ class WanGPAdapter:
         elif mask_path:
             if is_ltx2:
                 settings["video_prompt_type"] = "VVA"
-                settings["masking_strength"] = 1.0
             else:
                 settings["video_prompt_type"] = "MVA"
         else:

@@ -8,8 +8,8 @@ const cp = require('child_process');
 
 const ORCHESTRATOR_URL = "http://127.0.0.1:8000";
 const START_SCRIPT = os.platform() === 'win32' 
-    ? "F:\\progetti antigravity\\wan2gp Davinci\\start_wangp_services.bat"
-    : "/Users/Shared/wan2gp_Davinci/start_wangp_services.sh";
+    ? "F:\\progetti antigravity\\wan2gp_Davinci_17_06\\start_wangp_services.bat"
+    : "/Users/Shared/wan2gp_Davinci_17_06/start_wangp_services.sh";
 
 // --- DOM Elements ---
 const taskProfile = document.getElementById("taskProfile");

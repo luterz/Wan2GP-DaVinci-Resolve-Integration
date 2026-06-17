@@ -15,7 +15,9 @@ def main():
     # Implement Option A: If an image/video is provided (I2V), bypass Deepy 
     # to avoid hallucinatory text prompts clashing with the input image.
     if args.media_path and os.path.exists(args.media_path):
+        print("---DEEPY_OUTPUT_START---")
         print(json.dumps({"prompts": [args.prompt]}))
+        print("---DEEPY_OUTPUT_END---")
         return
 
     sys.path.insert(0, args.wan2gp_dir)
@@ -48,7 +50,9 @@ def main():
                 qwen_variant=get_qwen35_prompt_enhancer_variant(3),
             )
             
+        print("---DEEPY_OUTPUT_START---")
         print(json.dumps({"prompts": enhanced_prompts}))
+        print("---DEEPY_OUTPUT_END---")
         
     except Exception as e:
         print(f"Error running deepy: {e}", file=sys.stderr)
