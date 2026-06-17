@@ -168,12 +168,18 @@ class WanGPAdapter:
                 img = img.convert('RGB')
             img.save(ref_image_path)
 
+        if mask_path:
+            settings["video_mask"] = mask_path
+
         if is_edit_anything:
-            settings["video_prompt_type"] = "VGI"
+            if mask_path:
+                settings["video_prompt_type"] = "VGIA"
+            else:
+                settings["video_prompt_type"] = "VGI"
+            settings["audio_prompt_type"] = ""
             if ref_image_path:
                 settings["image_refs"] = ref_image_path
         elif mask_path:
-            settings["video_mask"] = mask_path
             if is_ltx2:
                 settings["video_prompt_type"] = "VVA"
                 settings["masking_strength"] = 1.0

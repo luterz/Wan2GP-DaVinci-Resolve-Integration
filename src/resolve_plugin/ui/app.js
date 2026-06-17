@@ -51,7 +51,7 @@ hideTerminalCheckbox.addEventListener("change", () => {
 // --- Model Definitions per Mode ---
 const MODE_MODELS = {
     inpaint: [
-        { value: "ltx2_22B_editanything", label: "LTX-2 2.3 EditAnything Ref V2V 22B", steps: 8 },
+        { value: "ltx2_22B_edit_anything", label: "LTX-2 2.3 EditAnything Ref V2V 22B", steps: 8 },
         { value: "vace_14B_2_2", label: "Wan 2.2 VACE 14B (Quality)", steps: 30 },
         { value: "vace_14B_fusionix", label: "VACE FusioniX 14B (Fast)", steps: 10 },
         { value: "vace_14B_lightning_3p_2_2", label: "VACE Lightning 14B (Ultra-fast)", steps: 8 },
@@ -125,7 +125,8 @@ if (referenceImageInput) {
 }
 
 function toggleEditAnything() {
-    const isEditAnything = modelSelect.value && modelSelect.value.includes("editanything");
+    const val = modelSelect.value || "";
+    const isEditAnything = val.includes("editanything") || val.includes("edit_anything");
     if (referenceImageRow) {
         referenceImageRow.style.display = isEditAnything ? "flex" : "none";
     }
