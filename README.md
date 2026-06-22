@@ -1,3 +1,5 @@
+<img width="1920" height="1016" alt="{30B92289-3C1F-44B3-AF6D-8D204F3648A5}" src="https://github.com/user-attachments/assets/9cd5897a-e2ed-41d1-8134-8fafc1eb75c7" />
+
 # Wan2GP DaVinci Resolve Integration
 
 This project integrates **Wan2GP (WanGP AI)** directly into **DaVinci Resolve**, providing the full native AI generator interface and drastically simplifying your workflow (clip extraction, inpainting, re-insertion) without ever having to leave your editing software.
