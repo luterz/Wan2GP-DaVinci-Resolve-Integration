@@ -29,7 +29,26 @@ def write_status(job_id: str, status_obj: JobStatus):
         f.write(status_obj.model_dump_json())
 
 def process_pending_jobs():
-    wangp_adapter = WanGPAdapter()
+    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+    wan2gp_dir = ""
+    if os.path.exists(config_path):
+        with open(config_path, "r") as f:
+            wan2gp_dir = json.load(f).get("wan2gp_dir", "")
+            
+    api_session = None
+    if wan2gp_dir and os.path.exists(wan2gp_dir):
+        print("[Job Processor] Initializing Wan2GP Native API Session...")
+        sys.path.insert(0, wan2gp_dir)
+        try:
+            from shared.api import init
+            from pathlib import Path
+            api_session = init(root=Path(wan2gp_dir), console_output=True)
+            print("[Job Processor] Wan2GP Native API Session initialized successfully!")
+        except Exception as e:
+            print(f"[Job Processor] Failed to initialize API Session: {e}")
+            api_session = None
+
+    wangp_adapter = WanGPAdapter(api_session=api_session)
     deepy_adapter = DeepyAdapter()
     pending_dir = os.path.join(JOBS_DIR, "pending")
     processing_dir = os.path.join(JOBS_DIR, "processing")
@@ -67,7 +86,7 @@ def process_pending_jobs():
                 if backend == "deepy":
                     result = deepy_adapter.process_job(job_data)
                 else:
-                    result = wangp_adapter.process_job(job_data)
+                    result = wangp_adapter.process_job(job_data, status_updater=lambda s: write_status(job_id, s), current_status=status)
                 
                 if result.get("status") == "success":
                     # Move to completed

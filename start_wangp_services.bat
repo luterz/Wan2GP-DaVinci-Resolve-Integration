@@ -1,26 +1,33 @@
 @echo off
 cd /d "%~dp0"
-echo Starting Wan2GP Resolve AI Orchestrator and DaVinci Resolve Bridge...
+echo Starting Wan2GP Native Web UI...
 
-:: Set DaVinci Resolve Python Scripting Environment Variables
-set RESOLVE_SCRIPT_API=%PROGRAMDATA%\Blackmagic Design\DaVinci Resolve\Support\Developer\Scripting
-set RESOLVE_SCRIPT_LIB=C:\Program Files\Blackmagic Design\DaVinci Resolve\fusionscript.dll
-set PYTHONPATH=%PROGRAMDATA%\Blackmagic Design\DaVinci Resolve\Support\Developer\Scripting\Modules;%PYTHONPATH%
-set PATH=C:\Program Files\Blackmagic Design\DaVinci Resolve;%PATH%
+:: Find Wan2GP Directory
+set WAN2GP_DIR=
+for /f "delims=" %%A in ('.venv\Scripts\python.exe -c "import json, os; print(json.load(open('src/orchestrator/config.json'))['wan2gp_dir']) if os.path.exists('src/orchestrator/config.json') else print('')"') do set WAN2GP_DIR=%%A
 
-cd src\orchestrator
+if "%WAN2GP_DIR%"=="" (
+    echo [ERROR] Wan2GP directory not found in config.json. Please run install_windows.bat again.
+    pause
+    exit /b 1
+)
+
+:: Find Wan2GP Python Executable
+set WAN2GP_PYTHON="%WAN2GP_DIR%\venv\Scripts\python.exe"
+if not exist %WAN2GP_PYTHON% set WAN2GP_PYTHON="%WAN2GP_DIR%\.venv\Scripts\python.exe"
+if not exist %WAN2GP_PYTHON% set WAN2GP_PYTHON="%WAN2GP_DIR%\wan2gp\Scripts\python.exe"
+if not exist %WAN2GP_PYTHON% set WAN2GP_PYTHON=python
+
+echo Launching Wan2GP from: %WAN2GP_DIR%
+cd /d "%WAN2GP_DIR%"
+
 if "%1"=="--hidden" (
-    start /B "WanGP Orchestrator API" ..\..\.venv\Scripts\uvicorn.exe main:app --host 127.0.0.1 --port 8000
-    start /B "WanGP Job Processor" ..\..\.venv\Scripts\python.exe job_processor.py
-    start /B "WanGP Deepy API" ..\..\.venv\Scripts\python.exe deepy_service.py
-    echo All services started silently in background!
+    start /B "Wan2GP Web UI" %WAN2GP_PYTHON% wgp.py
+    echo Wan2GP started silently in background!
     exit /b 0
 ) else (
-    start "WanGP Orchestrator API" ..\..\.venv\Scripts\uvicorn.exe main:app --host 127.0.0.1 --port 8000
-    start "WanGP Job Processor" ..\..\.venv\Scripts\python.exe job_processor.py
-    start "WanGP Deepy API" cmd /k "..\..\.venv\Scripts\python.exe deepy_service.py"
-    echo All services started in separate windows! 
+    start "Wan2GP Web UI" cmd /k "%WAN2GP_PYTHON% wgp.py"
+    echo Wan2GP started in a separate window! 
 )
-echo You can now open DaVinci Resolve and use the WanGP AI Workflow Integration.
-echo (Close the black terminal windows when you want to stop the servers)
+echo You can now use the Wan2GP UI inside DaVinci Resolve.
 pause

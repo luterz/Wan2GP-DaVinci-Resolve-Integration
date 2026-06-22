@@ -44,8 +44,9 @@ if exist "%RESOLVE_DIR%" (
 timeout /t 1 >nul
 mkdir "%RESOLVE_DIR%"
 copy /Y "src\resolve_plugin\ui\*.*" "%RESOLVE_DIR%" >nul
-echo Configuring paths...
-powershell -Command "(Get-Content '%RESOLVE_DIR%\app.js') -replace 'F:\\progetti antigravity\\wan2gp Davinci', '%CD:\=\\%' | Set-Content '%RESOLVE_DIR%\app.js'"
+
+:: Generate plugin_config.json with PROJECT_ROOT so app.js can find paths dynamically
+echo {"project_root": "%CD:\=\\%"} > "%RESOLVE_DIR%\plugin_config.json"
 
 echo Plugin copied successfully.
 echo.

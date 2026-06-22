@@ -20,28 +20,26 @@ def get_wan2gp_python(wan2gp_dir):
 
 
 class WanGPAdapter:
-    def __init__(self):
+    def __init__(self, api_session=None):
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
         self.output_dir = os.path.join(project_root, "data", "cache")
         os.makedirs(self.output_dir, exist_ok=True)
         config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.json")
         self.wan2gp_dir = ""
+        self.api_session = api_session
         if os.path.exists(config_path):
             with open(config_path, "r") as f:
                 self.wan2gp_dir = json.load(f).get("wan2gp_dir", "")
 
-    def process_job(self, job_data: dict) -> dict:
+    def process_job(self, job_data, status_updater=None, current_status=None):
         try:
-            if not self.wan2gp_dir:
-                return {"status": "error", "error": "Wan2GP directory not configured"}
-
-            mode = job_data.get("mode", "inpaint")
-            params = job_data.get("parameters", {})
+            job_id = job_data["id"]
+            params = job_data["params"]
             input_media = job_data.get("input_media", {})
-            job_id = job_data.get("id", "unknown")
-            model_type = params.get("model_type", "")
-            prompt = params.get("prompt", "")
-            resolution = params.get("out_resolution", "832x480")
+            mode = params.get("mode")
+            model_type = params.get("model_type")
+            prompt = params.get("prompt")
+            resolution = params.get("resolution", "1280x720")
 
             if mode == "inpaint":
                 settings = self._build_inpaint_settings(params, input_media, job_id, model_type, prompt, resolution)
@@ -55,51 +53,84 @@ class WanGPAdapter:
             if settings is None:
                 return {"status": "error", "error": "Failed to build settings"}
 
-            # Write settings and run WanGP
-            settings_path = os.path.join(self.output_dir, f"job_{job_id}_settings.json")
-            with open(settings_path, "w") as f:
-                json.dump(settings, f)
+            if self.api_session:
+                # Use native Python API
+                print(f"[{job_id}] Submitting task via Native API...")
+                job = self.api_session.submit_task(settings)
+                
+                for event in job.events.iter():
+                    if event.kind == "progress":
+                        progress = event.data
+                        if status_updater and current_status:
+                            pct = progress.progress
+                            if pct < 0:
+                                pct = 0
+                            elif pct > 100:
+                                pct = 100
+                            current_status.progress = pct
+                            current_status.progress_message = f"{progress.phase} ({progress.current_step}/{progress.total_steps})"
+                            status_updater(current_status)
+                    elif event.kind == "stream":
+                        line = event.data
+                        # Optional: Print or log stream text
+                        pass
 
-            env = os.environ.copy()
-            env["PYTHONPATH"] = f"{self.wan2gp_dir}{os.pathsep}{env.get('PYTHONPATH', '')}"
-            python_exe = get_wan2gp_python(self.wan2gp_dir)
+                result = job.result()
+                if not result.success:
+                    error_msg = result.errors[0].message if result.errors else "Unknown error"
+                    return {"status": "error", "error": error_msg}
+                
+                if not result.generated_files:
+                    return {"status": "error", "error": "No output file found"}
+                return {"status": "success", "output_path": result.generated_files[-1]}
 
-            cmd = [python_exe, "wgp.py", "--process", settings_path, "--output-dir", self.output_dir]
-            if params.get("fast_attention", True):
-                cmd.extend(["--attention", "sage2"])
-
-            process = subprocess.Popen(
-                cmd,
-                cwd=self.wan2gp_dir,
-                env=env,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True
-            )
-            stdout, stderr = process.communicate()
-
-            # Save logs
-            log_path = os.path.join(self.output_dir, "last_run.log")
-            with open(log_path, "w") as lf:
-                lf.write(f"STDOUT:\n{stdout}\n\nSTDERR:\n{stderr}")
-
-            if process.returncode != 0:
-                error_msg = stderr.strip() if stderr.strip() else stdout.strip()
-                return {"status": "error", "error": f"WanGP failed. Check last_run.log. Error: {error_msg[:500]}"}
-
-            # Find output
-            if mode == "audio_tts":
-                out_files = [os.path.join(self.output_dir, f) for f in os.listdir(self.output_dir)
-                             if f.endswith(".wav") or f.endswith(".mp3") or f.endswith(".flac") or f.endswith(".mp4")]
             else:
-                out_files = [os.path.join(self.output_dir, f) for f in os.listdir(self.output_dir)
-                             if f.endswith(".mp4") or f.endswith(".mov")]
-
-            if not out_files:
-                return {"status": "error", "error": "No output file found"}
-
-            latest = max(out_files, key=os.path.getmtime)
-            return {"status": "success", "output_path": latest}
+                # Fallback to subprocess if API not initialized
+                # Write settings and run WanGP
+                settings_path = os.path.join(self.output_dir, f"job_{job_id}_settings.json")
+                with open(settings_path, "w") as f:
+                    json.dump(settings, f)
+    
+                env = os.environ.copy()
+                env["PYTHONPATH"] = f"{self.wan2gp_dir}{os.pathsep}{env.get('PYTHONPATH', '')}"
+                python_exe = get_wan2gp_python(self.wan2gp_dir)
+    
+                cmd = [python_exe, "wgp.py", "--process", settings_path, "--output-dir", self.output_dir]
+                if params.get("fast_attention", True):
+                    cmd.extend(["--attention", "sage2"])
+    
+                process = subprocess.Popen(
+                    cmd,
+                    cwd=self.wan2gp_dir,
+                    env=env,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                stdout, stderr = process.communicate()
+    
+                # Save logs
+                log_path = os.path.join(self.output_dir, "last_run.log")
+                with open(log_path, "w") as lf:
+                    lf.write(f"STDOUT:\n{stdout}\n\nSTDERR:\n{stderr}")
+    
+                if process.returncode != 0:
+                    error_msg = stderr.strip() if stderr.strip() else stdout.strip()
+                    return {"status": "error", "error": f"WanGP failed. Check last_run.log. Error: {error_msg[:500]}"}
+    
+                # Find output
+                if mode == "audio_tts":
+                    out_files = [os.path.join(self.output_dir, f) for f in os.listdir(self.output_dir)
+                                 if f.endswith(".wav") or f.endswith(".mp3") or f.endswith(".flac") or f.endswith(".mp4")]
+                else:
+                    out_files = [os.path.join(self.output_dir, f) for f in os.listdir(self.output_dir)
+                                 if f.endswith(".mp4") or f.endswith(".mov")]
+    
+                if not out_files:
+                    return {"status": "error", "error": "No output file found"}
+    
+                latest = max(out_files, key=os.path.getmtime)
+                return {"status": "success", "output_path": latest}
         except Exception as e:
             return {"status": "error", "error": str(e)}
 
